@@ -1,23 +1,33 @@
 import os
 
-DIRECTORIES = ["equipment@", "modules@", "technologies@", "upgrades@"]
-
 
 def get_data(fileName: str, directories: list):
     aa = None
-    fileIsFound = False
+    fileIsFound1 = False
     for directory in directories:
-        if fileName in os.listdir(directory):
-            if fileIsFound:
-                raise Exception("found more than one files")
+        fileIsFound2 = fileName in os.listdir(directory)
+        if not fileIsFound1 and fileIsFound2:
             fileHandler = open(os.path.join(directory, fileName), "r")
             fileContent = fileHandler.read() + "\n"
             fileHandler.close()
             aa = parse_content(fileContent)
-            fileIsFound = True
-    if fileIsFound:
+            fileIsFound1 = True
+        elif fileIsFound1 and fileIsFound2:
+            raise Exception("found more than one files: %s" % fileName)
+    if aa == None:
+        raise Exception("did not find file")
+    else:
+        verify_data(aa)
         return aa
-    raise Exception("did not find file")
+
+
+def get_data(filePath: str):
+    fileHandler = open(filePath, "r")
+    fileContent = fileHandler.read() + "\n"
+    fileHandler.close()
+    aa = parse_content(fileContent)
+    verify_data(aa, filePath)
+    return aa
 
 
 def parse_content(content: str):
@@ -28,26 +38,28 @@ def parse_content(content: str):
     while contentIndex < len(content):
         character = content[contentIndex]
         contentIndex += 1
-        if character in "\t \"":
+        if character in '\t"':
             continue
         elif character == "\n":
             aa = process_newline(aa, key, string)
             key = ""
             string = ""
+        elif character == " ":
+            pass
         elif character == "#":
-            #contentIndex += process_comment(content[contentIndex:])
             contentIndex += content[contentIndex:].index("\n")
         elif character in "=<>":
             key = string
             string = ""
         elif character == "{":
-            data, offset = parse_content(content[contentIndex:])
+            value, offset = parse_content(content[contentIndex:])
+            aa = process_key_value_pair(aa, key, value)
             contentIndex += offset
-            aa = process_open_bracket(aa, key, data)
             key = ""
             string = ""
         elif character == "}":
-            return process_closed_bracket(aa, key, string), contentIndex
+            aa = process_closed_bracket(aa, key, string)
+            return aa, contentIndex
         elif character.isalnum() or character in "._":
             string += character
         else:
@@ -55,85 +67,67 @@ def parse_content(content: str):
     return aa
 
 
-def process_closed_bracket(aa, key: str, value: str):
-    if key == "" and value == "":
+def process_closed_bracket(aa, key: str, string: str):
+    if key == "" and string == "":
         return aa
-    elif value.isnumeric():
-        return {key: int(value)}
-    else:
-        return {key: value}
+    elif string.isnumeric():
+        return {key: int(string)}
+    return {key: string}
 
 
-def process_comment(content: str):
-    for index in range(0, len(content)):
-        if content[index] == "\n":
-            return index
-    raise Exception("did not find newline")
-
-
-def process_newline(aa, key: str, value: str):
-    if key == "" and value == "":
-        return aa
-    if value.isnumeric():
-        value = int(value)
-    if key == "":
-        if aa == None:
-            return [value]
-        elif type(aa) == dict:
-            if "noKey" in aa:
-                aa["noKey"] += [value]
-                return aa
-            else:
-                aa["noKey"] = [value]
-                return aa
-        return aa + [value]
-    else:
-        if aa == None:
-            return {key: value}
-        elif key not in aa:
-            aa[key] = value
-            return aa
-        suffix = 1
-        while (key + str(suffix)) in aa:
-            suffix += 1
-        aa[key + str(suffix)] = value
-        return aa
-
-
-def process_open_bracket(aa, key: str, data: dict):
+def process_key_value_pair(aa, key: str, value):
     if aa == None:
-        return {key: data}
+        return {key: value}
     elif key not in aa:
-        aa[key] = data
+        aa[key] = value
         return aa
     suffix = 1
     while (key + str(suffix)) in aa:
         suffix += 1
-    aa[key + str(suffix)] = data
+    aa[key + str(suffix)] = value
     return aa
 
 
-def verify_data(data: dict):
+def process_newline(aa, key: str, string: str):
+    if key == "" and string == "":
+        return aa
+    value = string
+    if string.isnumeric():
+        value = int(string)
+    if key != "":
+        return process_key_value_pair(aa, key, value)
+    elif aa == None:
+        return [value]
+    elif type(aa) == dict:
+        if "noKey" in aa:
+            aa["noKey"] += [value]
+        else:
+            aa["noKey"] = [value]
+        return aa
+    return aa + [value]
+
+
+def test(directories: list):
+    for directory, fileName in [(a, b) for a in directories for b in os.listdir(a)]:
+        if fileName[-4:] == ".txt":
+            get_data(os.path.join(directory, fileName))
+
+
+def verify_data(data: dict, filePath: str):
     for key in data:
         if key == None or key == "":
-            raise Exception("found empty key")
+            raise Exception("found empty key in %s" % filePath)
         if type(data[key]) == dict:
-            verify_data(data[key])
+            verify_data(data[key], filePath)
         elif type(data[key]) == list:
             verify_elements(data[key])
-        else:
-            verify_value(data[key])
-
-
-def verify_value(value):
-    if value == None or value == "":
-        raise Exception("found empty value")
+        elif data == None or data == "":
+            raise Exception("found empty data")
 
 
 def verify_elements(elements: list):
-    for i in range(0, len(elements)):
-        if elements[i] == None or elements[i] == "":
-            raise Exception("found empty element")
+    if None in elements or "" in elements:
+        raise Exception("found empty element")
 
 
 if __name__ == "__main__":
