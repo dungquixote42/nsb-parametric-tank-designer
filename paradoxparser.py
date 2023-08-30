@@ -3,112 +3,114 @@ import os
 DIRECTORIES = ["equipment@", "modules@", "technologies@", "upgrades@"]
 
 
-def get_data(fileName: str):
-    aaReturn = None
-    foundFile = False
-    for directory in DIRECTORIES:
+def get_data(fileName: str, directories: list):
+    aa = None
+    fileIsFound = False
+    for directory in directories:
         if fileName in os.listdir(directory):
-            if not foundFile:
-                fileHandler = open(os.path.join(directory, fileName), "r")
-                fileContent = fileHandler.read() + "\n"
-                fileHandler.close()
-                aaReturn = parse_content(fileContent)
-                foundFile = True
-            else:
+            if fileIsFound:
                 raise Exception("found more than one files")
-    if foundFile:
-        return aaReturn
+            fileHandler = open(os.path.join(directory, fileName), "r")
+            fileContent = fileHandler.read() + "\n"
+            fileHandler.close()
+            aa = parse_content(fileContent)
+            fileIsFound = True
+    if fileIsFound:
+        return aa
     raise Exception("did not find file")
 
 
 def parse_content(content: str):
-    aaReturn = None
+    aa = None
     contentIndex = 0
-    contentLength = len(content) - 1
     key = ""
     string = ""
-    while True:
-        if contentIndex > contentLength:
-            break
+    while contentIndex < len(content):
         character = content[contentIndex]
         contentIndex += 1
-        if character in "\t ":
+        if character in "\t \"":
             continue
         elif character == "\n":
-            aaReturn = process_newline(aaReturn, key, string)
+            aa = process_newline(aa, key, string)
             key = ""
             string = ""
         elif character == "#":
-            contentIndex += process_comment(content[contentIndex:])
+            #contentIndex += process_comment(content[contentIndex:])
+            contentIndex += content[contentIndex:].index("\n")
         elif character in "=<>":
             key = string
             string = ""
         elif character == "{":
             data, offset = parse_content(content[contentIndex:])
             contentIndex += offset
-            aaReturn = process_open_bracket(aaReturn, key, data)
+            aa = process_open_bracket(aa, key, data)
             key = ""
             string = ""
         elif character == "}":
-            aaReturn = process_closed_bracket(aaReturn, key, string)
-            return aaReturn, contentIndex
-        else:
+            return process_closed_bracket(aa, key, string), contentIndex
+        elif character.isalnum() or character in "._":
             string += character
-    return aaReturn
+        else:
+            raise Exception("found unhandled character: %c" % character)
+    return aa
 
 
-def process_closed_bracket(aaReturn, key: str, string: str):
-    if key == "" and string == "":
-        return aaReturn
+def process_closed_bracket(aa, key: str, value: str):
+    if key == "" and value == "":
+        return aa
+    elif value.isnumeric():
+        return {key: int(value)}
     else:
-        return {key: string}
+        return {key: value}
 
 
 def process_comment(content: str):
     for index in range(0, len(content)):
         if content[index] == "\n":
             return index
-    return None
+    raise Exception("did not find newline")
 
 
-def process_newline(aaReturn, key: str, string: str):
-    if key == "" and string == "":
-        return aaReturn
-    elif key == "":
-        if aaReturn == None:
-            return [string]
-        elif type(aaReturn) == dict:
-            if "noKey" in aaReturn:
-                aaReturn["noKey"] += [string]
-                return aaReturn
+def process_newline(aa, key: str, value: str):
+    if key == "" and value == "":
+        return aa
+    if value.isnumeric():
+        value = int(value)
+    if key == "":
+        if aa == None:
+            return [value]
+        elif type(aa) == dict:
+            if "noKey" in aa:
+                aa["noKey"] += [value]
+                return aa
             else:
-                aaReturn["noKey"] = [string]
-                return aaReturn
-        return aaReturn + [string]
+                aa["noKey"] = [value]
+                return aa
+        return aa + [value]
     else:
-        if aaReturn == None:
-            return {key: string}
-        elif key not in aaReturn:
-            aaReturn[key] = string
-            return aaReturn
+        if aa == None:
+            return {key: value}
+        elif key not in aa:
+            aa[key] = value
+            return aa
         suffix = 1
-        while (key + str(suffix)) in aaReturn:
+        while (key + str(suffix)) in aa:
             suffix += 1
-        aaReturn[key + str(suffix)] = string
-        return aaReturn
+        aa[key + str(suffix)] = value
+        return aa
 
 
-def process_open_bracket(aaReturn, key: str, data: dict):
-    if aaReturn == None:
+def process_open_bracket(aa, key: str, data: dict):
+    if aa == None:
         return {key: data}
-    elif key not in aaReturn:
-        aaReturn[key] = data
-        return aaReturn
+    elif key not in aa:
+        aa[key] = data
+        return aa
     suffix = 1
-    while (key + str(suffix)) in aaReturn:
+    while (key + str(suffix)) in aa:
         suffix += 1
-    aaReturn[key + str(suffix)] = data
-    return aaReturn
+    aa[key + str(suffix)] = data
+    return aa
 
 
 def verify_data(data: dict):
