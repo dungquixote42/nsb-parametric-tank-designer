@@ -1,32 +1,33 @@
 import os
 
 
-def get_data(fileName: str, directories: list):
-    aa = None
-    fileIsFound1 = False
-    for directory in directories:
-        fileIsFound2 = fileName in os.listdir(directory)
-        if not fileIsFound1 and fileIsFound2:
-            fileHandler = open(os.path.join(directory, fileName), "r")
-            fileContent = fileHandler.read() + "\n"
-            fileHandler.close()
-            aa = parse_content(fileContent)
-            fileIsFound1 = True
-        elif fileIsFound1 and fileIsFound2:
-            raise Exception("found more than one files: %s" % fileName)
-    if aa == None:
-        raise Exception("did not find file")
-    else:
-        verify_data(aa)
-        return aa
+COUNTS_AS_DATA = "-._"
 
 
-def get_data(filePath: str):
+def attempt_string_conversion(string: str):
+    isFloat = False
+    for character in string:
+        isMinus = character == "-"
+        isNumber = character.isnumeric()
+        isPeriod = character == "."
+        if not isMinus and not isNumber and not isPeriod:
+            return string
+        elif isFloat and isPeriod:
+            return string
+        elif isPeriod:
+            isFloat = True
+    if isFloat:
+        return float(string)
+    return int(string)
+
+
+def get_data(filePath: str, verifyData = True):
     fileHandler = open(filePath, "r")
     fileContent = fileHandler.read() + "\n"
     fileHandler.close()
     aa = parse_content(fileContent)
-    verify_data(aa, filePath)
+    if verifyData:
+        verify_data(aa, filePath)
     return aa
 
 
@@ -45,7 +46,7 @@ def parse_content(content: str):
             key = ""
             string = ""
         elif character == " ":
-            pass
+            process_space()
         elif character == "#":
             contentIndex += content[contentIndex:].index("\n")
         elif character in "=<>":
@@ -58,21 +59,31 @@ def parse_content(content: str):
             key = ""
             string = ""
         elif character == "}":
-            aa = process_closed_bracket(aa, key, string)
+            #aa = process_closed_bracket(aa, key, string)
+            aa = process_newline(aa, key, string)
             return aa, contentIndex
-        elif character.isalnum() or character in "._":
+        elif character.isalnum() or character in COUNTS_AS_DATA:
             string += character
         else:
             raise Exception("found unhandled character: %c" % character)
     return aa
 
 
+# def process_closed_bracket(aa, key: str, string: str):
+#     if key == "" and string == "":
+#         return aa
+#     elif string.isnumeric():
+#         return {key: int(string)}
+#     return {key: string}
+
+
 def process_closed_bracket(aa, key: str, string: str):
     if key == "" and string == "":
         return aa
-    elif string.isnumeric():
-        return {key: int(string)}
-    return {key: string}
+    value = attempt_string_conversion(string)
+    if key == "":
+        return value
+    return {key: value}
 
 
 def process_key_value_pair(aa, key: str, value):
@@ -91,20 +102,27 @@ def process_key_value_pair(aa, key: str, value):
 def process_newline(aa, key: str, string: str):
     if key == "" and string == "":
         return aa
-    value = string
-    if string.isnumeric():
-        value = int(string)
+    value = attempt_string_conversion(string)
     if key != "":
         return process_key_value_pair(aa, key, value)
     elif aa == None:
-        return [value]
+        return value
     elif type(aa) == dict:
-        if "noKey" in aa:
-            aa["noKey"] += [value]
+        if "_" not in aa:
+            aa["_"] = value
+        elif type(aa["_"]) == list:
+            aa["_"] += [value]
         else:
-            aa["noKey"] = [value]
+            aa["_"] = [aa["_"]] + [value]
         return aa
-    return aa + [value]
+    elif type(aa) == list:
+        return aa + [value]
+    else:
+        return [aa] + [value]
+
+
+def process_space():
+    pass
 
 
 def test(directories: list):
@@ -131,4 +149,4 @@ def verify_elements(elements: list):
 
 
 if __name__ == "__main__":
-    pass
+    print(get_data("test.txt"))
