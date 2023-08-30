@@ -1,5 +1,7 @@
 import os
 
+DIRECTORIES = ["equipment@", "modules@", "technologies@", "upgrades@"]
+
 
 class ParadoxParser:
     def __init__(self):
@@ -7,9 +9,9 @@ class ParadoxParser:
         self.contents = {}
         self.database = {}
 
-    def add_all_files_and_contents(self, directory: str):
+    def add_all_files_and_contents(self, directory: str, extension: str = ".txt"):
         for fileName in os.listdir(directory):
-            if fileName[-4:] != ".txt":
+            if fileName[-4:] != extension:
                 continue
             fileHandler = open(os.path.join(directory, fileName), "r")
             fileContent = fileHandler.read()
@@ -17,6 +19,23 @@ class ParadoxParser:
             fileName = fileName[:-4]
             self.files.append(fileName)
             self.contents[fileName] = fileContent + "\n"
+
+    def get_data(self, fileName: str):
+        aaReturn = None
+        foundFile = False
+        for directory in DIRECTORIES:
+            if fileName in os.listdir(directory):
+                if not foundFile:
+                    fileHandler = open(os.path.join(directory, fileName), "r")
+                    fileContent = fileHandler.read() + "\n"
+                    fileHandler.close()
+                    aaReturn = self.parse_content(fileContent)
+                    foundFile = True
+                else:
+                    raise Exception("found more than one files")
+        if foundFile:
+            return aaReturn
+        raise Exception("did not find file")
 
     def parse_all_contents(self):
         for contentKey in self.contents:
@@ -111,7 +130,7 @@ class ParadoxParser:
     def verify_database(self, database: dict):
         for key in database:
             if key == None or key == "":
-                raise ValueError
+                raise Exception("found empty key")
             if type(database[key]) == dict:
                 self.verify_database(database[key])
             elif type(database[key]) == list:
@@ -121,13 +140,13 @@ class ParadoxParser:
 
     def verify_entry(self, entry):
         if entry == None or entry == "":
-            raise ValueError
+            raise Exception("found empty key")
 
     def verify_entries(self, entries: list):
         for i in range(0, len(entries)):
             if entries[i] == None or entries[i] == "":
-                raise ValueError
+                raise Exception("found empty key")
 
 
 if __name__ == "__main__":
-    pp = ParadoxParser()
+    pass
