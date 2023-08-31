@@ -21,85 +21,7 @@ def attempt_string_conversion(string: str):
     return int(string)
 
 
-def get_data(filePath: str, verifyData = True):
-    fileHandler = open(filePath, "r")
-    fileContent = fileHandler.read() + "\n"
-    fileHandler.close()
-    aa = parse_content(fileContent)
-    if verifyData:
-        verify_data(aa, filePath)
-    return aa
-
-
-def parse_content(content: str):
-    aa = None
-    contentIndex = 0
-    key = ""
-    string = ""
-    while contentIndex < len(content):
-        character = content[contentIndex]
-        contentIndex += 1
-        if character in '\t"':
-            continue
-        elif character == "\n":
-            aa = process_newline(aa, key, string)
-            key = ""
-            string = ""
-        elif character == " ":
-            process_space()
-        elif character == "#":
-            contentIndex += content[contentIndex:].index("\n")
-        elif character in "=<>":
-            key = string
-            string = ""
-        elif character == "{":
-            value, offset = parse_content(content[contentIndex:])
-            aa = process_key_value_pair(aa, key, value)
-            contentIndex += offset
-            key = ""
-            string = ""
-        elif character == "}":
-            #aa = process_closed_bracket(aa, key, string)
-            aa = process_newline(aa, key, string)
-            return aa, contentIndex
-        elif character.isalnum() or character in COUNTS_AS_DATA:
-            string += character
-        else:
-            raise Exception("found unhandled character: %c" % character)
-    return aa
-
-
-# def process_closed_bracket(aa, key: str, string: str):
-#     if key == "" and string == "":
-#         return aa
-#     elif string.isnumeric():
-#         return {key: int(string)}
-#     return {key: string}
-
-
-def process_closed_bracket(aa, key: str, string: str):
-    if key == "" and string == "":
-        return aa
-    value = attempt_string_conversion(string)
-    if key == "":
-        return value
-    return {key: value}
-
-
-def process_key_value_pair(aa, key: str, value):
-    if aa == None:
-        return {key: value}
-    elif key not in aa:
-        aa[key] = value
-        return aa
-    suffix = 1
-    while (key + str(suffix)) in aa:
-        suffix += 1
-    aa[key + str(suffix)] = value
-    return aa
-
-
-def process_newline(aa, key: str, string: str):
+def commit_current_key_and_string(aa, key: str, string: str):
     if key == "" and string == "":
         return aa
     value = attempt_string_conversion(string)
@@ -121,8 +43,85 @@ def process_newline(aa, key: str, string: str):
         return [aa] + [value]
 
 
-def process_space():
-    pass
+def get_data(filePath: str, verifyData=True):
+    fileHandler = open(filePath, "r")
+    fileContent = fileHandler.read() + "\n"
+    fileHandler.close()
+    aa = parse_content(fileContent)
+    if verifyData:
+        verify_data(aa, filePath)
+    return aa
+
+
+def is_special_space_case(content: str, contentIndex: int):
+    for character in content[contentIndex:]:
+        if character == " ":
+            continue
+        elif character.isalnum() or character in COUNTS_AS_DATA:
+            break
+        else:
+            return False
+    for character in content[:contentIndex][::-1]:
+        if character == " ":
+            continue
+        elif character.isalnum() or character in COUNTS_AS_DATA:
+            return True
+        else:
+            return False
+    return False
+
+
+def parse_content(content: str):
+    aa = None
+    contentIndex = 0
+    maxIndex = len(content) - 1
+    key = ""
+    string = ""
+    while True:
+        if contentIndex > maxIndex:
+            break
+        character = content[contentIndex]
+        contentIndex += 1
+        if character == " " and is_special_space_case(content, contentIndex):
+            character = "\n"
+        if character in '\t "':
+            continue
+        elif character == "\n":
+            aa = commit_current_key_and_string(aa, key, string)
+            key = ""
+            string = ""
+        elif character == "#":
+            contentIndex += content[contentIndex:].index("\n")
+        elif character in "=<>":
+            key = string
+            string = ""
+        elif character == "{":
+            value, offset = parse_content(content[contentIndex:])
+            aa = process_key_value_pair(aa, key, value)
+            contentIndex += offset
+            key = ""
+            string = ""
+        elif character == "}":
+            aa = commit_current_key_and_string(aa, key, string)
+            return aa, contentIndex
+        elif character.isalnum() or character in COUNTS_AS_DATA:
+            string += character
+        else:
+            raise Exception("found unhandled character: %c" % character)
+    return aa
+
+
+def process_key_value_pair(aa, key: str, value):
+    if aa == None:
+        return {key: value}
+    elif key not in aa:
+        aa[key] = value
+        return aa
+    suffix = 1
+    while (key + str(suffix)) in aa:
+        suffix += 1
+    aa[key + str(suffix)] = value
+    return aa
 
 
 def test(directories: list):
