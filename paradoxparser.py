@@ -1,7 +1,8 @@
+import json
 import os
 
 
-COUNTS_AS_DATA = "-._"
+COUNTS_AS_DATA = "-.@_"
 
 
 def attempt_string_conversion(string: str):
@@ -21,12 +22,16 @@ def attempt_string_conversion(string: str):
     return int(string)
 
 
-def commit_current_key_and_string(aa, key: str, string: str):
+def character_is_data(character: str):
+    return character.isalnum() or character in COUNTS_AS_DATA
+
+
+def commit_current_key_and_string(aa, key: str, string: str, substitutionTable: dict):
     if key == "" and string == "":
         return aa
     value = attempt_string_conversion(string)
     if key != "":
-        return process_key_value_pair(aa, key, value)
+        return process_key_value_pair(aa, key, value, substitutionTable)
     elif aa == None:
         return value
     elif type(aa) == dict:
@@ -53,27 +58,36 @@ def get_data(filePath: str, verifyData=True):
     return aa
 
 
-def is_special_space_case(content: str, contentIndex: int):
+def handle_space(content: str, contentIndex: int, inQuotes: bool):
+    if inQuotes:
+        return " ", " "
+    elif space_is_delimiter(content, contentIndex):
+        return "\n", ""
+    return " ", ""
+
+
+def space_is_delimiter(content: str, contentIndex: int):
     for character in content[contentIndex:]:
         if character == " ":
             continue
-        elif character.isalnum() or character in COUNTS_AS_DATA:
+        elif character_is_data(character):
             break
         else:
             return False
     for character in content[:contentIndex][::-1]:
         if character == " ":
             continue
-        elif character.isalnum() or character in COUNTS_AS_DATA:
+        elif character_is_data(character):
             return True
         else:
             return False
     return False
 
 
-def parse_content(content: str):
+def parse_content(content: str, substitutionTable: dict = {}):
     aa = None
     contentIndex = 0
+    inQuotes = False
     maxIndex = len(content) - 1
     key = ""
     string = ""
@@ -82,36 +96,46 @@ def parse_content(content: str):
             break
         character = content[contentIndex]
         contentIndex += 1
-        if character == " " and is_special_space_case(content, contentIndex):
-            character = "\n"
-        if character in '\t "':
+        if character == " ":
+            newCharacter, oldCharacter = handle_space(content, contentIndex, inQuotes)
+            character = newCharacter
+            string += oldCharacter
+        if character in "\t ":
             continue
         elif character == "\n":
-            aa = commit_current_key_and_string(aa, key, string)
+            aa = commit_current_key_and_string(aa, key, string, substitutionTable)
             key = ""
             string = ""
+        elif character == '"':
+            inQuotes = not inQuotes
         elif character == "#":
             contentIndex += content[contentIndex:].index("\n")
         elif character in "=<>":
             key = string
             string = ""
         elif character == "{":
-            value, offset = parse_content(content[contentIndex:])
-            aa = process_key_value_pair(aa, key, value)
+            value, offset = parse_content(content[contentIndex:], substitutionTable)
+            aa = process_key_value_pair(aa, key, value, substitutionTable)
             contentIndex += offset
             key = ""
             string = ""
         elif character == "}":
-            aa = commit_current_key_and_string(aa, key, string)
+            aa = commit_current_key_and_string(aa, key, string, substitutionTable)
             return aa, contentIndex
-        elif character.isalnum() or character in COUNTS_AS_DATA:
+        elif character_is_data(character):
             string += character
         else:
             raise Exception("found unhandled character: %c" % character)
     return aa
 
 
-def process_key_value_pair(aa, key: str, value):
+def process_key_value_pair(aa, key: str, value, substitutionTable: dict):
+    if key[0] == "@":
+        substitutionTable[key] = value
+        return aa
+    if type(value) == str:
+        if value[0] == "@":
+            value = substitutionTable[value]
     if aa == None:
         return {key: value}
     elif key not in aa:
@@ -122,6 +146,12 @@ def process_key_value_pair(aa, key: str, value):
         suffix += 1
     aa[key + str(suffix)] = value
     return aa
+
+
+def save_as_json(data: dict, key: str, directory: str = "json"):
+    fileHandler = open(os.path.join(directory, key + ".json"), "w")
+    json.dump(data[key], fileHandler)
+    fileHandler.close()
 
 
 def test(directories: list):
@@ -148,4 +178,5 @@ def verify_elements(elements: list):
 
 
 if __name__ == "__main__":
-    print(get_data("test.txt"))
+    data = get_data(os.path.join("technologies@", "NSB_armor.txt"))
+    save_as_json(data["technologies"], "armor_tech_1")
