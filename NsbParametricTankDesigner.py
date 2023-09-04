@@ -3,19 +3,24 @@ import os
 import paradoxparser as pp
 
 
-ARCHETYPE_IDENTIFIER = "archetype"
-
 KEEP_ARCHETYPE = ["inherit"]
 
 PARENT_KEY_LAND_UPGRADES = "upgrades"
 PARENT_KEY_TANK_CHASSIS = "equipments"
 PARENT_KEY_TANK_MODULES = "equipment_modules"
-PARENT_KEY_TECHNOLOGY_GROUPS = "technologies"
+PARENT_KEY_TECH_GROUPS = "technologies"
 
 PATH_LAND_UPGRADES = os.path.join("upgrades@", "land_upgrades.txt")
 PATH_TANK_CHASSIS = os.path.join("equipment@", "tank_chassis.txt")
 PATH_TANK_MODULES = os.path.join("modules@", "00_tank_modules.txt")
-PATH_TECHNOLOGY_GROUPS = "technologies@"
+PATH_TECH_GROUPS = "technologies@"
+
+RELEVANT_CHASSIS_KEYS = ["enable_equipments"]
+RELEVANT_MODULE_KEYS = ["enable_equipment_modules"]
+
+TANK_ARCHETYPE_IDENTIFIER = "archetype"
+TANK_CHASSIS_IDENTIFIER = "enable_equipments"
+TANK_MODULE_IDENTIFIER = "enable_equipment_modules"
 
 
 class NsbParametricTankDesigner:
@@ -25,33 +30,60 @@ class NsbParametricTankDesigner:
         self.tankChassis = pp.get_data(PATH_TANK_CHASSIS)[PARENT_KEY_TANK_CHASSIS]
         self.tankModules = pp.get_data(PATH_TANK_MODULES)[PARENT_KEY_TANK_MODULES]
         self.tankTemplates = {}
-        self.technologies = []
-        self.validTechnologies = {}
-        self.fetch_valid_technologies()
+        self.techs = []
+        self.validChassisTechs = {}
+        self.validModuleTechs = {}
+        self.fetch_valid_techs()
         self.generate_tank_templates()
 
-    def add_technology(self, technology: str):
-        if technology not in self.validTechnologies:
-            raise Exception("invalid technology")
-        if technology in self.technologies:
+    def add_tech(self, techName: str):
+        if techName not in self.validModuleTechs:
+            raise Exception("invalid tech")
+        if techName in self.techs:
             raise Exception("already researched")
-        self.technologies.append(technology)
+        self.techs.append(techName)
 
-    def remove_technology(self, technology: str):
-        self.technologies.remove(technology)
+    def remove_tech(self, techName: str):
+        self.techs.remove(techName)
 
-    def reset_technologies(self):
-        self.technologies = []
+    def reset_techs(self):
+        self.techs = []
 
-    def fetch_valid_technologies(self):
-        self.technologyGroups = {}
-        for fileName in os.listdir(PATH_TECHNOLOGY_GROUPS):
-            filePath = os.path.join(PATH_TECHNOLOGY_GROUPS, fileName)
-            self.technologyGroups[fileName[:-4]] = pp.get_data(filePath)
-        for technologyGroup in self.technologyGroups:
-            self.validTechnologies[technologyGroup] = self.technologyGroups[
-                technologyGroup
-            ][PARENT_KEY_TECHNOLOGY_GROUPS]
+    def fetch_valid_tech(self, techGroup: str, tech: str):
+        pass
+
+    def fetch_valid_techs(self):
+        techGroups = {}
+        for fileName in os.listdir(PATH_TECH_GROUPS):
+            filePath = os.path.join(PATH_TECH_GROUPS, fileName)
+            techGroups[fileName] = pp.get_data(filePath)[PARENT_KEY_TECH_GROUPS]
+        for techGroupName, techName in [
+            (techGroupName, techName)
+            for techGroupName in techGroups
+            for techName in techGroups[techGroupName]
+        ]:
+            tech = techGroups[techGroupName][techName]
+            if TANK_CHASSIS_IDENTIFIER in tech and any(
+                chassis in tech[TANK_CHASSIS_IDENTIFIER] for chassis in self.tankChassis
+            ):
+                self.validChassisTechs[techName] = tech[TANK_CHASSIS_IDENTIFIER]
+            if TANK_MODULE_IDENTIFIER in tech and any(
+                module in tech[TANK_MODULE_IDENTIFIER] for module in self.tankModules
+            ):
+                self.validModuleTechs[techName] = tech[TANK_MODULE_IDENTIFIER]
+        # for techGroup, tech in [
+        #     (tG, t) for tG in techGroups for t in techGroups[tG]
+        # ]:
+        #     if TANK_MODULE_IDENTIFIER in techGroups[techGroup][
+        #         tech
+        #     ] and any(
+        #         module
+        #         in techGroups[techGroup][tech][TANK_MODULE_IDENTIFIER]
+        #         for module in self.tankModules
+        #     ):
+        #         self.validModuleTechs[tech] = techGroups[
+        #             techGroup
+        #         ][tech][TANK_MODULE_IDENTIFIER]
 
     def generate_tank_template(self, tankName: str, tankData: dict, archetype: dict):
         self.tankTemplates[tankName] = copy.deepcopy(archetype)
@@ -62,25 +94,28 @@ class NsbParametricTankDesigner:
     def generate_tank_templates(self):
         for tankName in self.tankChassis:
             tankData = self.tankChassis[tankName]
-            if ARCHETYPE_IDENTIFIER in tankData:
-                archetype = self.tankChassis[tankData[ARCHETYPE_IDENTIFIER]]
+            if TANK_ARCHETYPE_IDENTIFIER in tankData:
+                archetype = self.tankChassis[tankData[TANK_ARCHETYPE_IDENTIFIER]]
                 self.generate_tank_template(tankName, tankData, archetype)
+
+    def generate_tanks(self):
+        pass
 
 
 class Tank:
     def __init__(self, template: dict):
-        self.statistics = copy.deepcopy(template)
+        self.stats = copy.deepcopy(template)
 
 
 if __name__ == "__main__":
     tankDesigner = NsbParametricTankDesigner()
-    # print(tankDesigner.validTechnologies["NSB_armor"]["gwtank_chassis"])
-    for key in tankDesigner.validTechnologies:
-        print(key)
+    # print(tankDesigner.validTechs["NSB_armor"]["gwtank_chassis"])
+    #print(tankDesigner.validChassisTechs)
+    print(tankDesigner.validModuleTechs)
 
-    # tankDesigner.add_technology("gwtank_chassis")
-    # print(tankDesigner.validTechnologies)
-    # print(tankDesigner.technologies)
+    # tankDesigner.add_tech("gwtank_chassis")
+    # print(tankDesigner.validTechs)
+    # print(tankDesigner.techs)
 
     # landUpgrades = os.path.join("upgrades@", "land_upgrades.txt")
     # landUpgrades = pp.get_data(landUpgrades)
@@ -91,10 +126,10 @@ if __name__ == "__main__":
     # tankModules = os.path.join("modules@", "00_tank_modules.txt")
     # tankModules = pp.get_data(tankModules)
 
-    # technologyGroups = {}
-    # for fileName in os.listdir("technologies@"):
-    #     filePath = os.path.join("technologies@", fileName)
-    #     technologyGroups[fileName[:-4]] = pp.get_data(filePath)
+    # techGroups = {}
+    # for fileName in os.listdir("techs@"):
+    #     filePath = os.path.join("techs@", fileName)
+    #     techGroups[fileName[:-4]] = pp.get_data(filePath)
 
     # pp.save_as_json("json", landUpgrades, "upgrades")
     # pp.save_as_json("json", tankModules, "equipment_modules")
@@ -106,6 +141,6 @@ if __name__ == "__main__":
     # shipHullCarrier = pp.get_data(shipHullCarrier, True)
     # print(shipHullCarrier)
 
-    # electronicMechanicalEngineering = os.path.join("technologies@", "electronic_mechanical_engineering.txt")
+    # electronicMechanicalEngineering = os.path.join("techs@", "electronic_mechanical_engineering.txt")
     # electronicMechanicalEngineering = pp.get_data(electronicMechanicalEngineering, True)
     # print(electronicMechanicalEngineering)

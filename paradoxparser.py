@@ -133,9 +133,8 @@ def process_key_value_pair(aa, key: str, value, substitutionTable: dict):
     if key[0] == "@":
         substitutionTable[key] = value
         return aa
-    if type(value) == str:
-        if value[0] == "@":
-            value = substitutionTable[value]
+    if type(value) == str and value[0] == "@":
+        value = substitutionTable[value]
     if aa == None:
         return {key: value}
     elif key not in aa:
@@ -178,5 +177,5 @@ def verify_elements(elements: list):
 
 
 if __name__ == "__main__":
-    data = get_data(os.path.join("technologies@", "NSB_armor.txt"))
-    save_as_json(data["technologies"], "armor_tech_1")
+    data = get_data(os.path.join("equipment@", "tank_chassis.txt"))
+    save_as_json(data["equipments"], "armor_tech_1")
