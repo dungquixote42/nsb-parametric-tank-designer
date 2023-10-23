@@ -27,6 +27,7 @@ class NsbParametricTankDesigner:
     def __init__(self):
         self.Tanks = []
         self.landUpgrades = pp.get_data(PATH_LAND_UPGRADES)[PARENT_KEY_LAND_UPGRADES]
+        self.requiredModules = {}
         self.tankChassis = pp.get_data(PATH_TANK_CHASSIS)[PARENT_KEY_TANK_CHASSIS]
         self.tankModules = pp.get_data(PATH_TANK_MODULES)[PARENT_KEY_TANK_MODULES]
         self.tankTemplates = {}
@@ -49,9 +50,6 @@ class NsbParametricTankDesigner:
     def reset_techs(self):
         self.techs = []
 
-    def fetch_valid_tech(self, techGroup: str, tech: str):
-        pass
-
     def fetch_valid_techs(self):
         techGroups = {}
         for fileName in os.listdir(PATH_TECH_GROUPS):
@@ -71,19 +69,6 @@ class NsbParametricTankDesigner:
                 module in tech[TANK_MODULE_IDENTIFIER] for module in self.tankModules
             ):
                 self.validModuleTechs[techName] = tech[TANK_MODULE_IDENTIFIER]
-        # for techGroup, tech in [
-        #     (tG, t) for tG in techGroups for t in techGroups[tG]
-        # ]:
-        #     if TANK_MODULE_IDENTIFIER in techGroups[techGroup][
-        #         tech
-        #     ] and any(
-        #         module
-        #         in techGroups[techGroup][tech][TANK_MODULE_IDENTIFIER]
-        #         for module in self.tankModules
-        #     ):
-        #         self.validModuleTechs[tech] = techGroups[
-        #             techGroup
-        #         ][tech][TANK_MODULE_IDENTIFIER]
 
     def generate_tank_template(self, tankName: str, tankData: dict, archetype: dict):
         self.tankTemplates[tankName] = copy.deepcopy(archetype)
@@ -97,9 +82,26 @@ class NsbParametricTankDesigner:
             if TANK_ARCHETYPE_IDENTIFIER in tankData:
                 archetype = self.tankChassis[tankData[TANK_ARCHETYPE_IDENTIFIER]]
                 self.generate_tank_template(tankName, tankData, archetype)
+                self.generate_required_modules(archetype)
 
     def generate_tanks(self):
-        pass
+        validChassis = []
+        validModules = []
+        for techName in self.techs:
+            if techName in self.validChassisTechs:
+                validChassis += self.validChassisTechs[techName]
+            if techName in self.validModuleTechs:
+                validModules += self.validModuleTechs[techName]
+        for chassis in validChassis:
+            tankStats = copy.deepcopy(self.tankTemplates[chassis])
+
+
+        print(validChassis)
+        print(validModules)
+
+    def generate_required_modules(self, archetype: dict):
+        for chassis in self.tankChassis:
+            
 
 
 class Tank:
@@ -109,9 +111,14 @@ class Tank:
 
 if __name__ == "__main__":
     tankDesigner = NsbParametricTankDesigner()
+    tankDesigner.add_tech("gwtank_chassis")
+    tankDesigner.generate_tanks()
+    for tT in tankDesigner.tankTemplates:
+        print(tT)
+
     # print(tankDesigner.validTechs["NSB_armor"]["gwtank_chassis"])
-    #print(tankDesigner.validChassisTechs)
-    print(tankDesigner.validModuleTechs)
+    # print(tankDesigner.validChassisTechs)
+    # print(tankDesigner.validModuleTechs)
 
     # tankDesigner.add_tech("gwtank_chassis")
     # print(tankDesigner.validTechs)

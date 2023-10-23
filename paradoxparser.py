@@ -177,5 +177,5 @@ def verify_elements(elements: list):
 
 
 if __name__ == "__main__":
-    data = get_data(os.path.join("equipment@", "tank_chassis.txt"))
-    save_as_json(data["equipments"], "armor_tech_1")
+    data = get_data(os.path.join("technologies@", "NSB_armor.txt"))
+    save_as_json(data["technologies"], "basic_light_tank_chassis")
